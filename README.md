@@ -1,7 +1,7 @@
 enhanced-limit-conn-nginx-module
 ================================
 
-This is a enhanced limit conn nginx module.
+This is an enhanced limit conn nginx module.
 
 ###Feature
 
