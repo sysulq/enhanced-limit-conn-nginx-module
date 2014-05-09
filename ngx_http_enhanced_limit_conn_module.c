@@ -30,13 +30,12 @@ typedef struct {
 typedef struct {
     ngx_shm_zone_t     *shm_zone;
     ngx_uint_t          conn;
-    ngx_uint_t          overload_conn;
 } ngx_http_limit_conn_limit_t;
 
 typedef struct {
     ngx_array_t limits;
 
-    ngx_flag_t  enable;
+    ngx_flag_t  sysguard_enable;
     ngx_int_t   overload;
     ngx_int_t   load;
     ngx_int_t   swap;
@@ -116,7 +115,7 @@ static ngx_command_t  ngx_http_limit_conn_commands[] = {
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_limit_conn_conf_t, enable),
+      offsetof(ngx_http_limit_conn_conf_t, sysguard_enable),
       NULL },
 
     { ngx_string("sysguard_load"),
@@ -180,7 +179,7 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
 {
     size_t                          len, n;
     uint32_t                        hash;
-    ngx_uint_t                      i, limit_conn;
+    ngx_uint_t                      i;
     ngx_slab_pool_t                *shpool;
     ngx_rbtree_node_t              *node;
     ngx_pool_cleanup_t             *cln;
@@ -263,7 +262,7 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
 
             lc = (ngx_http_limit_conn_node_t *) &node->color;
 
-            if ((ngx_uint_t) lc->conn >= limit_conn) {
+            if ((ngx_uint_t) lc->conn >= limits[i].conn) {
 
                 ngx_shmtx_unlock(&shpool->mutex);
 
@@ -278,8 +277,8 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
             lc->conn++;
         }
 
-        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "limit conn: %08XD %d %d", node->key, lc->conn);
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "limit conn: %08XD %d", node->key, lc->conn);
 
         ngx_shmtx_unlock(&shpool->mutex);
 
@@ -507,7 +506,7 @@ ngx_http_limit_conn_create_conf(ngx_conf_t *cf)
      *     conf->limits.elts = NULL;
      */
 
-    conf->enable = NGX_CONF_UNSET;
+    conf->sysguard_enable = NGX_CONF_UNSET;
     conf->overload = NGX_CONF_UNSET;
     conf->load = NGX_CONF_UNSET;
     conf->swap = NGX_CONF_UNSET;
@@ -529,7 +528,7 @@ ngx_http_limit_conn_merge_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->limits = prev->limits;
     }
 
-    ngx_conf_merge_value(conf->enable, prev->enable, 0);
+    ngx_conf_merge_value(conf->sysguard_enable, prev->sysguard_enable, 0);
     ngx_conf_merge_value(conf->overload, prev->overload, 0);
     ngx_conf_merge_value(conf->load, prev->load, NGX_CONF_UNSET);
     ngx_conf_merge_value(conf->swap, prev->swap, NGX_CONF_UNSET);
@@ -775,7 +774,6 @@ ngx_http_limit_conn(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     limit = ngx_array_push(&lccf->limits);
     limit->conn = n;
-    limit->overload_conn = n>>1;
     limit->shm_zone = shm_zone;
 
     return NGX_CONF_OK;
@@ -1049,7 +1047,7 @@ ngx_http_sysguard_handler(ngx_http_request_t *r)
 
     lccf = ngx_http_get_module_loc_conf(r, ngx_http_limit_conn_module);
 
-    if (!lccf->enable) {
+    if (!lccf->sysguard_enable) {
         return NGX_OK;
     }
 
