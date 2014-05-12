@@ -4,9 +4,6 @@
 #include <ngx_http.h>
 
 typedef struct {
-} ngx_http_sysguard_conf_t;
-
-typedef struct {
     u_char              color;
     u_char              len;
     u_short             conn;
@@ -196,7 +193,7 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
 
     lccf = ngx_http_get_module_loc_conf(r, ngx_http_limit_conn_module);
 
-	if (ngx_http_sysguard_handler(r) == NGX_DECLINED) {
+    if (ngx_http_sysguard_handler(r) == NGX_DECLINED) {
         return NGX_DECLINED;
     }
 
